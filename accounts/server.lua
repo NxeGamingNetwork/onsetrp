@@ -1,3 +1,4 @@
+local _ = function(k,...) return ImportPackage("i18n").t(GetPackageName(),k,...) end
 PlayerData = {}
 
 function OnPackageStart()
@@ -64,7 +65,7 @@ function OnAccountCheckBan(player)
 
 		print("Kicking "..GetPlayerName(player).." because their account was banned")
 
-		KickPlayer(player, "🚨 You have been banned from the server:\n\nReason: "..result['reason'].."\nTime: "..result['FROM_UNIXTIME(bans.ban_time)'])
+		KickPlayer(player, _("banned_for", result['reason'], result['FROM_UNIXTIME(bans.ban_time)']))
 	end
 end
 
@@ -137,17 +138,18 @@ function OnAccountLoaded(player)
 		SetPlayerName(player, PlayerData[player].name)
 		
 		playerhairscolor = getHairsColor(PlayerData[player].clothing[2])
-		CallRemoteEvent(player, "ClientChangeClothing", 0, PlayerData[player].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
-		CallRemoteEvent(player, "ClientChangeClothing", 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
-		CallRemoteEvent(player, "ClientChangeClothing", 4, PlayerData[player].clothing[4], 0, 0, 0, 0)
-		CallRemoteEvent(player, "ClientChangeClothing", 5, PlayerData[player].clothing[5], 0, 0, 0, 0)
+		CallRemoteEvent(player, "ClientChangeClothing", player, 0, PlayerData[player].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
+		CallRemoteEvent(player, "ClientChangeClothing", player, 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
+		CallRemoteEvent(player, "ClientChangeClothing", player, 4, PlayerData[player].clothing[4], 0, 0, 0, 0)
+		CallRemoteEvent(player, "ClientChangeClothing", player, 5, PlayerData[player].clothing[5], 0, 0, 0, 0)
 		
 		SetPlayerHealth(player, tonumber(result['health']))
 		SetPlayerArmor(player, tonumber(result['armor']))
         setPlayerThirst(player, tonumber(result['thirst']))
         setPlayerHunger(player, tonumber(result['hunger']))
 
-        SetPlayerLoggedIn(player)
+		SetPlayerLoggedIn(player)
+		CallRemoteEvent(player, "AskSpawnMenu")
 
 		AddPlayerChat(player, '<span color="#ffff00aa" style="bold italic" size="17">SERVER: Welcome back '..GetPlayerName(player)..', have fun!</>')
 

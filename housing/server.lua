@@ -1,6 +1,6 @@
 local _ = function(k,...) return ImportPackage("i18n").t(GetPackageName(),k,...) end
 
-local houses = {
+houses = {
     {
         id = 1,
         price = 100,
@@ -796,9 +796,10 @@ function OnPackageStart()
 		for k,v in pairs(houses) do
             SaveHouseData(k)
             
-		end
+        end
+        print("All houses have been saved !")
     end, 30000)
-    print("All houses have been saved !")
+    
 end
 AddEvent("OnPackageStart", OnPackageStart)
 
@@ -858,20 +859,6 @@ AddEvent("database:connected", function()
     end)
     
 end)
-
-AddEvent("OnPlayerSpawn", function( player )
-    Delay( 500, function()
-        local house = getHouseOwner(player)
-
-        if house ~= 0 then
-            if houses[house].spawnable == 1 then
-                SetPlayerLocation(player, houses[house].spawn[1], houses[house].spawn[2], houses[house].spawn[3] + 100)
-                SetPlayerHeading( player, houses[house].spawn[4] )
-            end
-        end
-    end)
-end)
-
 
 AddRemoteEvent("interactHouse", function(player, door) 
     local house = getHouseDoor(door)
@@ -967,4 +954,19 @@ function SaveHouseData(house)
     )
     
 mariadb_query(sql, query)
+end
+
+function GetNearestHouseDoor(player)
+    local x, y, z = GetPlayerLocation(player)
+
+    for k,v in pairs(houses) do
+            for i,j in pairs(v.doors) do
+                local x2, y2, z2 = GetDoorLocation( j.entity )
+                local dist = GetDistance3D(x, y, z, x2, y2, z2)
+                if dist < 150.0 then
+                    return j.entity
+                end
+            end
+        end
+    return 0
 end
