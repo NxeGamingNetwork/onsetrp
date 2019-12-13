@@ -29,3 +29,15 @@ AddEvent("OnKeyPress", function( key )
         Dialog.show(gpsMenu)
     end
 end)
+
+AddRemoteEvent("ClientCreateWaypoint", function(name, x, y, z)
+    if currentWaypoint ~= nil then
+        DestroyWaypoint(currentWaypoint)
+    end
+    currentWaypoint = CreateWaypoint(tonumber(x), tonumber(y), tonumber(z), tostring(name))    
+end)
+
+AddRemoteEvent("ClientDestroyCurrentWaypoint", function()
+    DestroyWaypoint(currentWaypoint)
+end)
+

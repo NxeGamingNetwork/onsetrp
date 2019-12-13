@@ -10,7 +10,8 @@ CarDealerTable = {
 					vehicle_6 = 1000,
 					vehicle_7 = 1000,
 					vehicle_11 = 1000,
-					vehicle_12 = 1000 
+                    vehicle_12 = 1000,
+                    vehicle_25 = 1000
 		},
 		colors = {
 			black = "0000",
