@@ -30,6 +30,8 @@ local hairsColor = {
     blond = { 250, 240, 190, 1 },
     black = { 0, 0, 0, 1 },
     red = { 255, 0, 0, 1 },
+	green = { 0, 255, 0, 1 },
+	blue = { 0, 0, 255, 1 },
     brown = { 139, 69, 19, 1 }
 }
 
@@ -45,6 +47,12 @@ AddRemoteEvent("ServerChangeClothes", function(player, playername, playerhairs, 
     table.insert(PlayerData[player].clothing, getShirtsModel(playershirt))
     table.insert(PlayerData[player].clothing, getPantsModel(playerpants))
     table.insert(PlayerData[player].clothing, getShoesModel(playershoes))
+    
+    table.insert(PlayerData[player].clothing_police, "/Game/CharacterModels/SkeletalMesh/Outfits/HZN_Outfit_Police_Hat_LPR")
+    table.insert(PlayerData[player].clothing_police, playerhairscolor)
+    table.insert(PlayerData[player].clothing_police, "/Game/CharacterModels/SkeletalMesh/Outfits/HZN_Outfit_Police_Shirt-Short_LPR")
+    table.insert(PlayerData[player].clothing_police, "/Game/CharacterModels/Clothing/Meshes/SK_Jeans01")
+    table.insert(PlayerData[player].clothing_police, "/Game/CharacterModels/SkeletalMesh/Outfits/HZN_Outfit_Piece_BusinessShoes_LPR")
 
     playerhairscolor = getHairsColor(PlayerData[player].clothing[2])
     
@@ -53,9 +61,11 @@ AddRemoteEvent("ServerChangeClothes", function(player, playername, playerhairs, 
     CallRemoteEvent(player, "ClientChangeClothing", player, 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
     CallRemoteEvent(player, "ClientChangeClothing", player, 4, PlayerData[player].clothing[4], 0, 0, 0, 0)
     CallRemoteEvent(player, "ClientChangeClothing", player, 5, PlayerData[player].clothing[5], 0, 0, 0, 0)
-
-    CallRemoteEvent(player, "OpenSpawnMenu", spawnLocation)
+    
     CallRemoteEvent(player, "AskSpawnMenu")
+    CallRemoteEvent(player, "OpenSpawnMenu", spawnLocation)
+
+    PlayerData[player].created = 1
 
     for k,v in pairs(GetStreamedPlayersForPlayer(player)) do
         ChangeOtherPlayerClothes(k, player)
@@ -63,6 +73,19 @@ AddRemoteEvent("ServerChangeClothes", function(player, playername, playerhairs, 
 end)
 
 AddEvent("OnPlayerSpawn", function( player )
+    if PlayerData[player] == nil then
+        return
+    end
+    if PlayerData[player].clothing == nil then
+        return
+    end
+    if PlayerData[player].clothing[1] == nil then
+        return
+    end
+    if PlayerData[player].job == "police" then
+	GetUniformServer(player)
+	return
+    end
     playerhairscolor = getHairsColor(PlayerData[player].clothing[2])
     CallRemoteEvent(player, "ClientChangeClothing", player, 0, PlayerData[player].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
     CallRemoteEvent(player, "ClientChangeClothing", player, 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
@@ -71,6 +94,15 @@ AddEvent("OnPlayerSpawn", function( player )
 end)
 
 function ChangeOtherPlayerClothes(player, otherplayer)
+    if PlayerData[otherplayer] == nil then
+        return
+    end
+    if PlayerData[otherplayer].clothing == nil then
+        return
+    end
+    if PlayerData[otherplayer].clothing[1] == nil then
+        return
+    end
     playerhairscolor = getHairsColor(PlayerData[otherplayer].clothing[2])
     CallRemoteEvent(player, "ClientChangeClothing", otherplayer, 0, PlayerData[otherplayer].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
     CallRemoteEvent(player, "ClientChangeClothing", otherplayer, 1, PlayerData[otherplayer].clothing[3], 0, 0, 0, 0)

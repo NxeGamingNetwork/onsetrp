@@ -1,17 +1,17 @@
 local _ = function(k,...) return ImportPackage("i18n").t(GetPackageName(),k,...) end
 
 CarDealerObjectsCached = { }
-CarDealerTable = { 
+CarDealerTable = {
 	{
-		vehicles = { 
-					vehicle_1 = 1000,
-					vehicle_4 = 1000,
-					vehicle_5 = 1000,
-					vehicle_6 = 1000,
-					vehicle_7 = 1000,
-					vehicle_11 = 1000,
-                    vehicle_12 = 1000,
-                    vehicle_25 = 1000
+		vehicles = {
+				vehicle_1 = 3000,
+				vehicle_4 = 3000,
+				vehicle_5 = 3000,
+				vehicle_6 = 10000,
+				vehicle_7 = 10000,
+				vehicle_11 = 20000,
+				vehicle_12 = 15000,
+				vehicle_25 = 500
 		},
 		colors = {
 			black = "0000",
@@ -20,8 +20,50 @@ CarDealerTable = {
 			green = "00FF00"
 
 		},
-		location = { 128990, 80774, 1567, 180 },
-		spawn = { 127720, 80774, 1567, 180 }
+		location = { -174924, -64183, 1151, 180 },
+		spawn = { -175442, -64850, 1130, 180 }
+    },
+    {
+		vehicles = {
+			vehicle_1 = 3000,
+			vehicle_4 = 3000,
+			vehicle_5 = 3000,
+			vehicle_6 = 10000,
+			vehicle_7 = 10000,
+			vehicle_11 = 20000,
+			vehicle_12 = 15000,
+			vehicle_25 = 500
+		},
+		colors = {
+			black = "0000",
+			red = "FF0000",
+			blue = "0000FF",
+			green = "00FF00"
+
+		},
+		location = { 205292, 168386, 1306, 180 },
+		spawn = { 204692, 168415, 1306, 180 }
+    },
+    {
+		vehicles = {
+			vehicle_1 = 3000,
+			vehicle_4 = 3000,
+			vehicle_5 = 3000,
+			vehicle_6 = 10000,
+			vehicle_7 = 10000,
+			vehicle_11 = 20000,
+			vehicle_12 = 15000,
+			vehicle_25 = 500
+		},
+		colors = {
+			black = "0000",
+			red = "FF0000",
+			blue = "0000FF",
+			green = "00FF00"
+
+		},
+		location = { -24737, -18052, 2087, -150 },
+		spawn = { -25060, -18800, 2062, -150 }
 	}
 }
 AddEvent("OnPackageStart", function()
@@ -49,8 +91,8 @@ AddRemoteEvent("carDealerInteract", function(player, cardealerobject)
 				if cardealerobject == v.npc then
 					CallRemoteEvent(player, "openCarDealer", v.vehicles, v.colors)
 				end
-			end  
-			
+			end
+
 		end
 	end
 end)
@@ -85,8 +127,8 @@ function buyCarServer(player, modelid, color, cardealerobject)
 	local color = getVehicleColor(color, cardealerobject)
 	local modelid = getVehicleId(modelid)
 
-	if tonumber(price) > PlayerData[player].cash then
-        AddPlayerChat(player, _("no_money_car"))
+	if tonumber(price) > GetPlayerCash(player) then
+        CallRemoteEvent(player, "MakeNotification",_("no_money_car"), "linear-gradient(to right, #ff5f6d, #ffc371)")
     else
         local x, y, z = GetPlayerLocation(player)
 
@@ -94,35 +136,28 @@ function buyCarServer(player, modelid, color, cardealerobject)
             local x2, y2, z2 = GetNPCLocation(v.npc)
             local dist = GetDistance3D(x, y, z, x2, y2, z2)
             if dist < 150.0 then
+                local isSpawnable = true
                 for k,w in pairs(GetAllVehicles()) do
                     local x3, y3, z3 = GetVehicleLocation(w)
                     local dist2 = GetDistance3D(v.spawn[1], v.spawn[2], v.spawn[3], x3, y3, z3)
-                    if dist2 > 1000.0 then
-                        -- if no vehicle on the spawn zone continue
-                        local vehicle = CreateVehicle(modelid, v.spawn[1], v.spawn[2], v.spawn[3], v.spawn[4])
-                        SetVehicleRespawnParams(vehicle, false)
-                        SetVehicleColor(vehicle, "0x"..color)
-                        SetVehiclePropertyValue(vehicle, "locked", true, true)
-                        CreateVehicleData(player, vehicle, modelid)
-                        CreateVehicleDatabase(player, vehicle, modelid, color, price)
-                        PlayerData[player].cash = PlayerData[player].cash - tonumber(price)
-                        CallRemoteEvent(player, "closeCarDealer")
-                        return AddPlayerChat(player, _("car_buy_sucess", name, price, _("currency")))
-                    else
-                        -- if vehicle on the spawn zone cancel and report an error
-                        return AddPlayerChat(player, _("cannot_spawn_vehicle"))
+                    if dist2 < 1000.0 then
+                      isSpawnable = false
+                      break
                     end
                 end
-                -- if no vehicle in the world spawn the car
-                local vehicle = CreateVehicle(modelid, v.spawn[1], v.spawn[2], v.spawn[3], v.spawn[4])
-                SetVehicleColor(vehicle, "0x"..color)
-                SetVehicleRespawnParams(vehicle, false)
-                SetVehiclePropertyValue(vehicle, "locked", true, true)
-                CreateVehicleData(player, vehicle, modelid)
-                CreateVehicleDatabase(player, vehicle, modelid, color, price)
-                PlayerData[player].cash = PlayerData[player].cash - tonumber(price)
-                CallRemoteEvent(player, "closeCarDealer")
-                return AddPlayerChat(player, _("car_buy_sucess", name, price, _("currency")))
+                if isSpawnable then
+                    local vehicle = CreateVehicle(modelid, v.spawn[1], v.spawn[2], v.spawn[3], v.spawn[4])
+                    SetVehicleRespawnParams(vehicle, false)
+                    SetVehicleColor(vehicle, "0x"..color)
+                    SetVehiclePropertyValue(vehicle, "locked", true, true)
+                    CreateVehicleData(player, vehicle, modelid)
+                    CreateVehicleDatabase(player, vehicle, modelid, color, price)
+                    RemovePlayerCash(player, price)
+                    CallRemoteEvent(player, "closeCarDealer")
+                    return CallRemoteEvent(player, "MakeNotification", _("car_buy_sucess", name, price, _("currency")), "linear-gradient(to right, #00b09b, #96c93d)")
+                else
+                    return CallRemoteEvent(player, "MakeNotification", _("cannot_spawn_vehicle"), "linear-gradient(to right, #ff5f6d, #ffc371)")
+                end
             end
         end
     end

@@ -25,6 +25,68 @@ function OnPackageStart()
         print("All vehicle have been saved !")
     end, 30000)
     
+
+    CreateTimer(function()
+        local vehicleToDelete = {}
+        for k,v in pairs(GetAllVehicles()) do
+            local hasOwner = false
+            for w,z in pairs(GetAllPlayers()) do
+                if VehicleData[v] == nil then
+                    hasOwner = true
+                    break
+                end
+                if PlayerData[z] == nil then
+                    goto continue
+                end
+                if PlayerData[z].accountid == 0 or PlayerData[z].accountid == nil then
+                    goto continue
+                end
+                if VehicleData[v].owner == PlayerData[z].accountid then
+                    hasOwner = true
+                    print(VehicleData[v].owner)
+                    print(PlayerData[z].accountid )
+                    break
+                end
+                ::continue::
+            end
+            if not hasOwner then
+                table.insert(vehicleToDelete, v)
+            end
+        end
+        for k,v in pairs(vehicleToDelete) do
+            local hasOwner = false
+            for w,z in pairs(GetAllPlayers()) do
+                if VehicleData[v] == nil then
+                    hasOwner = true
+                    break
+                end
+		if PlayerData[z] == nil then
+                    goto continue
+                end
+                if PlayerData[z].accountid == 0 or PlayerData[z].accountid == nil then
+                    goto continue
+                end
+                if VehicleData[v].owner == PlayerData[z].accountid then
+                    hasOwner = true
+                    print(VehicleData[v].owner)
+                    print(PlayerData[z].accountid )
+                    break
+                end
+		::continue::
+            end
+            if not hasOwner then
+                if VehicleData[v].garageid ~= 0 then
+                    local query = mariadb_prepare(sql, "UPDATE `player_garage` SET `garage`=1 WHERE `id` = ?;",
+                    VehicleData[v].garageid
+                    )
+                    mariadb_async_query(sql, query)
+                end
+                DestroyVehicleData(v)
+                DestroyVehicle(v)
+            end
+        end
+        print("All vehicle have been cleaned up !")
+    end, 900000)
 end
 AddEvent("OnPackageStart", OnPackageStart)
 
@@ -39,7 +101,7 @@ mariadb_query(sql, query)
 end
 
 function DestroyVehicleData(vehicle)
-	if (VehicleData[vehicle] ~= nil) then
+	if (VehicleData[vehicle] == nil) then
 		return
     end
 
@@ -50,7 +112,7 @@ AddRemoteEvent("ServerVehicleMenu", function(player, vehicle)
     if VehicleData[vehicle].owner == PlayerData[player].accountid then
         CallRemoteEvent(player, "OpenVehicleMenu")
     else
-        for k,v in pairs(vehicle.keys) do
+        for k,v in pairs(VehicleData[vehicle].keys) do
             if v == PlayerData[player].accountid then
                 CallRemoteEvent(player, "OpenVehicleMenu")
             end
@@ -62,30 +124,44 @@ function unlockVehicle(player)
     local nearestCar = GetNearestCar(player)
     local vehicle = VehicleData[nearestCar] 
     if nearestCar ~= 0 then
-        if vehicle.owner == PlayerData[player].accountid then
+        if PlayerData[player].admin == 1 then
             if GetVehiclePropertyValue(nearestCar, "locked") then
-                AddPlayerChat(player, _("car_unlocked"))
+                CallRemoteEvent(player, "MakeNotification", _("car_unlocked"), "linear-gradient(to right, #00b09b, #96c93d)")
                 SetVehiclePropertyValue(nearestCar, "locked", false, true)
                 CallRemoteEvent(player, "PlayAudioFile", "carUnlock.mp3")
             else
-                AddPlayerChat(player, _("car_locked"))
+                CallRemoteEvent(player, "MakeNotification", _("car_locked"), "linear-gradient(to right, #00b09b, #96c93d)")
                 SetVehiclePropertyValue(nearestCar, "locked", true, true)
                 CallRemoteEvent(player, "PlayAudioFile", "carLock.mp3")
             end
+            return
+        end
+        if vehicle.owner == PlayerData[player].accountid then
+            if GetVehiclePropertyValue(nearestCar, "locked") then
+                CallRemoteEvent(player, "MakeNotification", _("car_unlocked"), "linear-gradient(to right, #00b09b, #96c93d)")
+                SetVehiclePropertyValue(nearestCar, "locked", false, true)
+                CallRemoteEvent(player, "PlayAudioFile", "carUnlock.mp3")
+            else
+                CallRemoteEvent(player, "MakeNotification", _("car_locked"), "linear-gradient(to right, #00b09b, #96c93d)")
+                SetVehiclePropertyValue(nearestCar, "locked", true, true)
+                CallRemoteEvent(player, "PlayAudioFile", "carLock.mp3")
+            end
+            return
         else
             for k,v in pairs(vehicle.keys) do
                 if v == PlayerData[player].accountid then
                     if GetVehiclePropertyValue(nearestCar, "locked") then
-                        AddPlayerChat(player, _("car_unlocked"))
+                        CallRemoteEvent(player, "MakeNotification", _("car_unlocked"), "linear-gradient(to right, #00b09b, #96c93d)")
                         SetVehiclePropertyValue(nearestCar, "locked", false, true)
                         CallRemoteEvent(player, "PlayAudioFile", "carUnlock.mp3")
                     else
-                        AddPlayerChat(player, _("car_locked"))
+                        CallRemoteEvent(player, "MakeNotification", _("car_locked"), "linear-gradient(to right, #00b09b, #96c93d)")
                         SetVehiclePropertyValue(nearestCar, "locked", true, true)
                         CallRemoteEvent(player, "PlayAudioFile", "carLock.mp3")
                     end
                 end
             end
+            return
         end
     end
 end
@@ -119,7 +195,7 @@ end)
 AddRemoteEvent("VehicleStore", function(player, item, amount) 
     local vehicle = GetNearestCar(player)
     if tonumber(PlayerData[player].inventory[item]) < tonumber(amount) then
-        AddPlayerChat(player, _("not_enough_item"))
+        CallRemoteEvent(player, "MakeNotification", _("not_enough_item"), "linear-gradient(to right, #ff5f6d, #ffc371)")
     else
         RemoveInventory(player, item, amount)
         AddVehicleInventory(vehicle, item, amount)
@@ -130,7 +206,7 @@ AddRemoteEvent("VehicleUnstore", function(player, item, amount)
     local vehicle = GetNearestCar(player)
 
     if tonumber(VehicleData[vehicle].inventory[item]) < tonumber(amount) then
-        AddPlayerChat(player, _("not_enough_item"))
+        CallRemoteEvent(player, "MakeNotification", _("not_enough_item"), "linear-gradient(to right, #ff5f6d, #ffc371)")
     else
         AddInventory(player, item, amount)
         RemoveVehicleInventory(vehicle, item, amount)
@@ -145,7 +221,7 @@ AddRemoteEvent("VehicleGiveKey", function(player, toplayer)
     if VehicleData[vehicle].keys[toplayer] == nil then
         VehicleData[vehicle].keys[toplayer] = 1
     else
-        AddPlayerChat(player, _("already_have_key"))
+        CallRemoteEvent(player, "MakeNotification", _("already_have_key"), "linear-gradient(to right, #ff5f6d, #ffc371)")
     end
 end)
 
@@ -222,3 +298,24 @@ function RemoveVehicleInventory(vehicle, item, amount)
         end
     end
 end
+
+AddRemoteEvent("ToggleEngine", function(player, vehicle)
+    if vehicle ~= 0 then
+        if (GetPlayerVehicleSeat(player) ~= 1) then
+            return 
+        else
+            if GetVehicleEngineState(vehicle) then
+                StopVehicleEngine(vehicle)
+            else
+                if VehicleData[vehicle] ~= nil then
+                    if VehicleData[vehicle].fuel > 0 then
+                        StartVehicleEngine(vehicle)
+                    end
+                else
+                    StartVehicleEngine(vehicle)
+                end
+            end
+        end
+    end
+end)
+

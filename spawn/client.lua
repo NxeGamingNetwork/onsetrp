@@ -4,6 +4,13 @@ local _ = function(k,...) return ImportPackage("i18n").t(GetPackageName(),k,...)
 local spawnMenu
 
 local spawnAsked = false
+onSpawn = false
+
+AddEvent("OnKeyPress", function(key)
+    if onSpawn then
+        Dialog.show(spawnMenu)
+    end
+end)
 
 AddEvent("OnTranslationReady", function()
     spawnMenu = Dialog.create(_("spawn_menu"), nil, _("spawn"))
@@ -35,6 +42,7 @@ AddRemoteEvent("OpenSpawnMenu", function(spawnList, house)
         spawns["house"] = _("house")
     end
     Dialog.setSelectLabeledOptions(spawnMenu, 1, 1, spawns) 
+    onSpawn = true
     Dialog.show(spawnMenu)
 end)
 
@@ -43,9 +51,10 @@ AddEvent("OnDialogSubmit", function(dialog, button, ...)
 	if dialog == spawnMenu then
 		if button == 1 then
 			if args[1] == "" then
-                AddPlayerChat(_("select_city"))
+                MakeNotification(_("select_city"), "linear-gradient(to right, #ff5f6d, #ffc371)")
                 CallRemoteEvent("ServerSpawnMenu")
             else
+                onSpawn = false
                 CallRemoteEvent("PlayerSpawn", args[1])
 			end
 		end

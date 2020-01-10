@@ -1,38 +1,53 @@
 local _ = function(k,...) return ImportPackage("i18n").t(GetPackageName(),k,...) end
 
 spawnLocation = {
-    town = { -182821, -41675, 1160 },
-    gas_station = { 125773, 80246, 1645 },
-    desert_town = { -16223, -8033, 2062 },
-    old_town = { 39350, 138061, 1570 }
+    -- The three last value are temporary until RandomFloat is fixed
+    town = { 170402, 38013, 1180, "-", "-", "" },
+    city = { 211526, 176056, 1450, "", "", "" },
+    desert_town = { 16223, 8033, 2080, "-", "-", "" },
+    old_town = { 39350, 138061, 1690, "", "", "" }
 }
 
 AddRemoteEvent("ServerSpawnMenu", function(player)
-    local house = getHouseOwner(player)
-
-    local hasHouse = false
-    if house ~= 0 then
-        if houses[house].spawnable == 1 then
-            hasHouse = true
-        end
+    if(PlayerData[player].job == "medic") then
+	CallRemoteEvent(player, "UpdateMedicUniform", player)
     end
+    if(PlayerData[player].health_state == "revived") then
+	PlayerData[player].health_state = "alive"
+	SetPlayerHealth(player, 50)
+	SetPlayerSpawnLocation(player, 227603, -65590, 237, 0 )
+    elseif(PlayerData[player].health_state == "no_medic") then
+	PlayerData[player].health_state = "alive"
+	SetPlayerHealth(player, 100)
+    else
+	local house = getHouseOwner(player)
 
-    CallRemoteEvent(player, "OpenSpawnMenu", spawnLocation, hasHouse)
+	local hasHouse = false
+	if house ~= 0 then
+	    if houses[house].spawnable == 1 then
+		hasHouse = true
+	    end
+	end
+
+	CallRemoteEvent(player, "OpenSpawnMenu", spawnLocation, hasHouse)
+    end
 end)
 
 AddRemoteEvent("PlayerSpawn", function(player, spawn)
     if spawn == "house" then
-        local house = getHouseOwner(player)
+	local house = getHouseOwner(player)
 
-        if house ~= 0 then
-            if houses[house].spawnable == 1 then
-                SetPlayerLocation(player, houses[house].spawn[1], houses[house].spawn[2], houses[house].spawn[3] + 100)
-                SetPlayerHeading( player, houses[house].spawn[4] )
-            end
-        end
+	if house ~= 0 then
+	    if houses[house].spawnable == 1 then
+		SetPlayerLocation(player, houses[house].spawn[1], houses[house].spawn[2], houses[house].spawn[3] + 100)
+		SetPlayerHeading( player, houses[house].spawn[4] )
+	    end
+	end
     else
         spawnSelect = GetSpawnLocation(spawn)
-        SetPlayerLocation(player, spawnSelect[1], spawnSelect[2], spawnSelect[3])
+        spawnx = RandomFloat(spawnSelect[1] - 500, spawnSelect[1] + 500)
+        spawny = RandomFloat(spawnSelect[2] - 500, spawnSelect[2] + 500)
+        SetPlayerLocation(player, spawnSelect[4]..spawnx, spawnSelect[5]..spawny, spawnSelect[6]..spawnSelect[3] + 200)
     end
 end)
 

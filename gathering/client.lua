@@ -10,7 +10,7 @@ end)
 
 
 function OnKeyPress(key)
-    if key == "E" then
+    if key == "E" and not onSpawn and not onCharacterCreation then
         local NearestGatherZone = GetNearestGatherZone()
         local NearestProcessZone = GetNearestProcessZone()
 
@@ -31,7 +31,7 @@ function GetNearestGatherZone()
         local x2, y2, z2 = GetPickupLocation(v)
 		local dist = GetDistance3D(x, y, z, x2, y2, z2)
 
-		if dist < 150.0 then
+		if dist < 4000.0 then
 			for k,i in pairs(gatherIds) do
 				if v == i then
 					return v

@@ -6,18 +6,16 @@ function OnPackageStart()
     CreateTimer(function()
 		for k, v in pairs(GetAllPlayers()) do
             SavePlayerAccount(v)
-            print("All accounts have been saved !")
 		end
+		print("All accounts have been saved !")
     end, 30000)
 end
 AddEvent("OnPackageStart", OnPackageStart)
 
 function OnPlayerSteamAuth(player)
 
-    CreatePlayerData(player)
-    
-    AddPlayerChatAll('<span color="#eeeeeeaa">'..GetPlayerName(player)..' from '..PlayerData[player].locale..' joined the server</>')
-    AddPlayerChatAll('<span color="#eeeeeeaa">There are '..GetPlayerCount()..' players on the server</>')
+	CreatePlayerData(player)
+	PlayerData[player].steamname = GetPlayerName(player)
     
     -- First check if there is an account for this player
 	local query = mariadb_prepare(sql, "SELECT id FROM accounts WHERE steamid = '?' LIMIT 1;",
@@ -27,29 +25,26 @@ function OnPlayerSteamAuth(player)
 end
 AddEvent("OnPlayerSteamAuth", OnPlayerSteamAuth)
 
-function OnPlayerJoin(player)
-	SetPlayerSpawnLocation(player, 125773.000000, 80246.000000, 1645.000000, -90.0)
-end
-AddEvent("OnPlayerJoin", OnPlayerJoin)
-
 function OnPlayerQuit(player)
     SavePlayerAccount(player)
 
     DestroyPlayerData(player)
-    print("Data destroyed for : "..player)
 end
 AddEvent("OnPlayerQuit", OnPlayerQuit)
 
 function OnAccountLoadId(player)
 	if (mariadb_get_row_count() == 0) then
 		--There is no account for this player, continue by checking if their IP was banned		
-        CheckForIPBan(player)
+        local query = mariadb_prepare(sql, "SELECT FROM_UNIXTIME(bans.ban_time), bans.reason FROM bans WHERE bans.steamid = ?;",
+			tostring(GetPlayerSteamId(player)))
+
+		mariadb_async_query(sql, query, OnAccountCheckBan, player)
 	else
 		--There is an account for this player, continue by checking if it's banned
         PlayerData[player].accountid = mariadb_get_value_index(1, 1)
 
-		local query = mariadb_prepare(sql, "SELECT FROM_UNIXTIME(bans.ban_time), bans.reason FROM bans WHERE bans.id = ?;",
-			PlayerData[player].accountid)
+		local query = mariadb_prepare(sql, "SELECT FROM_UNIXTIME(bans.ban_time), bans.reason FROM bans WHERE bans.steamid = ?;",
+			tostring(GetPlayerSteamId(player)))
 
 		mariadb_async_query(sql, query, OnAccountCheckBan, player)
 	end
@@ -94,7 +89,7 @@ function OnAccountCheckIpBan(player)
 end
 
 function CreatePlayerAccount(player)
-	local query = mariadb_prepare(sql, "INSERT INTO accounts (id, steamid) VALUES (NULL, '?');",
+	local query = mariadb_prepare(sql, "INSERT INTO accounts (id, steamid, clothing, clothing_police, death_pos, inventory, position, drug_knowledge) VALUES (NULL, '?', '[]' , '[]' , '[]' , '[]' , '[]', '[]');",
 		tostring(GetPlayerSteamId(player)))
 
 	mariadb_query(sql, query, OnAccountCreated, player)
@@ -105,12 +100,11 @@ function OnAccountCreated(player)
 
 	CallRemoteEvent(player, "askClientCreation")
 
-    SetPlayerLoggedIn(player)
+	SetPlayerLoggedIn(player)
+	SetAvailablePhoneNumber(player)
+	setPositionAndSpawn(player, nil)
 
 	print("Account ID "..PlayerData[player].accountid.." created for "..player)
-
-	AddPlayerChat(player, '<span color="#ffff00aa" style="bold italic" size="15">SERVER: Welcome to the community, '..GetPlayerName(player)..', have fun and play fair!</>')
-	AddPlayerChatAll('<span color="00ee00ff">We now have'..PlayerData[player].accountid..' accounts registered</>')
 end
 
 function LoadPlayerAccount(player)
@@ -120,6 +114,11 @@ function LoadPlayerAccount(player)
 	mariadb_async_query(sql, query, OnAccountLoaded, player)
 end
 
+function LoadPlayerPhoneContacts(player)
+	local query = mariadb_prepare(sql, "SELECT * FROM phone_contacts WHERE phone_contacts.owner_id = ? ORDER BY phone_contacts.name;", PlayerData[player].accountid)
+
+	mariadb_async_query(sql, query, OnPhoneContactsLoaded, player)
+end
 
 function OnAccountLoaded(player)
 	if (mariadb_get_row_count() == 0) then
@@ -127,34 +126,100 @@ function OnAccountLoaded(player)
 		KickPlayer(player, "An error occured while loading your account 😨")
 	else
 		local result = mariadb_get_assoc(1)
-
 		PlayerData[player].admin = math.tointeger(result['admin'])
-		PlayerData[player].cash = math.tointeger(result['cash'])
 		PlayerData[player].bank_balance = math.tointeger(result['bank_balance'])
 		PlayerData[player].name = tostring(result['name'])
 		PlayerData[player].clothing = json_decode(result['clothing'])
+		PlayerData[player].clothing_police = json_decode(result['clothing_police'])
+		PlayerData[player].police = math.tointeger(result['police'])
+		PlayerData[player].medic = math.tointeger(result['medic'])
+		PlayerData[player].health_state = "alive" 
+		PlayerData[player].death_pos = json_decode(result['death_pos'])
+		PlayerData[player].driver_license = math.tointeger(result['driver_license'])
+		PlayerData[player].gun_license = math.tointeger(result['gun_license'])
+		PlayerData[player].helicopter_license = math.tointeger(result['helicopter_license'])
 		PlayerData[player].inventory = json_decode(result['inventory'])
+		PlayerData[player].created = math.tointeger(result['created'])
+		PlayerData[player].position = json_decode(result['position'])
+		PlayerData[player].drug_knowledge = json_decode(result['drug_knowledge'])
+    
 
-		SetPlayerName(player, PlayerData[player].name)
-		
-		playerhairscolor = getHairsColor(PlayerData[player].clothing[2])
-		CallRemoteEvent(player, "ClientChangeClothing", player, 0, PlayerData[player].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
-		CallRemoteEvent(player, "ClientChangeClothing", player, 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
-		CallRemoteEvent(player, "ClientChangeClothing", player, 4, PlayerData[player].clothing[4], 0, 0, 0, 0)
-		CallRemoteEvent(player, "ClientChangeClothing", player, 5, PlayerData[player].clothing[5], 0, 0, 0, 0)
-		
+		if result['phone_number'] and result['phone_number'] ~= "" then
+			PlayerData[player].phone_number = tostring(result['phone_number'])
+		else
+			SetAvailablePhoneNumber(player)
+		end
+
 		SetPlayerHealth(player, tonumber(result['health']))
 		SetPlayerArmor(player, tonumber(result['armor']))
-        setPlayerThirst(player, tonumber(result['thirst']))
-        setPlayerHunger(player, tonumber(result['hunger']))
+		setPlayerThirst(player, tonumber(result['thirst']))
+		setPlayerHunger(player, tonumber(result['hunger']))
+		setPositionAndSpawn(player, PlayerData[player].position)
 
 		SetPlayerLoggedIn(player)
-		CallRemoteEvent(player, "AskSpawnMenu")
 
-		AddPlayerChat(player, '<span color="#ffff00aa" style="bold italic" size="17">SERVER: Welcome back '..GetPlayerName(player)..', have fun!</>')
+		if PlayerData[player].created == 0 then
+			CallRemoteEvent(player, "askClientCreation")
+		else
+			SetPlayerName(player, PlayerData[player].name)
+		
+			playerhairscolor = getHairsColor(PlayerData[player].clothing[2])
+			CallRemoteEvent(player, "ClientChangeClothing", player, 0, PlayerData[player].clothing[1], playerhairscolor[1], playerhairscolor[2], playerhairscolor[3], playerhairscolor[4])
+			CallRemoteEvent(player, "ClientChangeClothing", player, 1, PlayerData[player].clothing[3], 0, 0, 0, 0)
+			CallRemoteEvent(player, "ClientChangeClothing", player, 4, PlayerData[player].clothing[4], 0, 0, 0, 0)
+			CallRemoteEvent(player, "ClientChangeClothing", player, 5, PlayerData[player].clothing[5], 0, 0, 0, 0)		
+			DisplayPlayerBackpack(player)	
+			-- CallRemoteEvent(player, "AskSpawnMenu")
+		end
+		
+		LoadPlayerPhoneContacts(player)
 
 		print("Account ID "..PlayerData[player].accountid.." loaded for "..GetPlayerIP(player))
 	end
+end
+
+function setPositionAndSpawn(player, position) 
+	SetPlayerSpawnLocation(player, 227603, -65590, 400, 0 )
+	if position ~= nil and position.x ~= nil and position.y ~= nil and position.z ~= nil then
+		SetPlayerLocation(player, PlayerData[player].position.x, PlayerData[player].position.y, PlayerData[player].position.z + 250) -- Pour empêcher de se retrouver sous la map
+	else
+		SetPlayerLocation(player, 227603, -65590, 400)
+	end
+end
+
+function SetAvailablePhoneNumber(player)
+	-- Generate a random phone number
+	local phone_number = "555"..tostring(math.random(100000, 999999))
+
+	local query = mariadb_prepare(sql, "SELECT id FROM accounts WHERE phone_number = ?;",
+		phone_number)
+
+	mariadb_async_query(sql, query, OnPhoneNumberChecked, player, phone_number)
+end
+
+function OnPhoneNumberChecked(player, phone_number)
+	if (mariadb_get_row_count() == 0) then
+		-- If phone number is available
+		local query = mariadb_prepare(sql, "UPDATE accounts SET phone_number = ? WHERE id = ?", phone_number, PlayerData[player].accountid)
+
+		PlayerData[player].phone_number = phone_number
+
+		mariadb_async_query(sql, query)
+	else
+		-- Retry with a new phone number if the generated one is already allowed to another account
+		GetAvailablePhoneNumber(player)
+	end
+end
+
+function OnPhoneContactsLoaded(player)
+	for i = 1, mariadb_get_row_count() do
+		local contact = mariadb_get_assoc(i)
+		if contact['id'] then
+			PlayerData[player].phone_contacts[i] = { id = tostring(contact['id']),  name = contact['name'], phone = contact['phone'] }
+		end
+	end
+
+	print("Phone contacts loaded for "..PlayerData[player].accountid)
 end
 
 function CreatePlayerData(player)
@@ -163,26 +228,55 @@ function CreatePlayerData(player)
 	PlayerData[player].accountid = 0
 	PlayerData[player].name = ""
 	PlayerData[player].clothing = {}
-	PlayerData[player].inventory = {}
-    PlayerData[player].logged_in = false
-    PlayerData[player].admin = 0
-    PlayerData[player].locale = GetPlayerLocale(player)
-    PlayerData[player].thirst = 100
-    PlayerData[player].hunger = 100
-    PlayerData[player].cash = 0
-	PlayerData[player].bank_balance = 1000
+	PlayerData[player].clothing_police = {}
+	PlayerData[player].police = 0
+	PlayerData[player].medic = 0
+	PlayerData[player].inventory = { cash = 100 }
+	PlayerData[player].driver_license = 0
+	PlayerData[player].gun_license = 0
+	PlayerData[player].helicopter_license = 0
+	PlayerData[player].logged_in = false
+	PlayerData[player].admin = 0
+	PlayerData[player].created = 0
+	PlayerData[player].steamid = GetPlayerSteamId(player)
+	PlayerData[player].steamname = ""
+	PlayerData[player].thirst = 100
+	PlayerData[player].hunger = 100
+	PlayerData[player].bank_balance = 900
 	PlayerData[player].job_vehicle = nil
 	PlayerData[player].job = ""
+	PlayerData[player].onAction = false
+	PlayerData[player].isActioned = false
+	PlayerData[player].phone_contacts = {}
+	PlayerData[player].phone_number = {}
+	PlayerData[player].health_state = "alive"
+	PlayerData[player].death_pos = {}
+	PlayerData[player].position = {}
+	PlayerData[player].backpack = nil
+	PlayerData[player].drug_knowledge = {}
+
 
     print("Data created for : "..player)
 end
 
 function DestroyPlayerData(player)
-	if (PlayerData[player] ~= nil) then
+	if (PlayerData[player] == nil) then
 		return
-    end
+	end
+	
+	if PlayerData[player].job_vehicle ~= nil then
+        DestroyVehicle(PlayerData[player].job_vehicle)
+        DestroyVehicleData( PlayerData[player].job_vehicle)
+        PlayerData[player].job_vehicle = nil
+	end
+	
+	if PlayerData[player].backpack ~= nil then
+		DestroyObject(PlayerData[player].backpack)
+    	PlayerData[player].backpack = nil
+	end
 
-    PlayerData[player] = nil
+	PlayerData[player] = nil
+	print("Data destroyed for : "..player)
 end
 
 function SavePlayerAccount(player)
@@ -194,25 +288,42 @@ function SavePlayerAccount(player)
 		return
 	end
 
-	local query = mariadb_prepare(sql, "UPDATE accounts SET admin = ?, cash = ?, bank_balance = ?, health = ?, armor = ?, hunger = ?, thirst = ?, name = '?', clothing = '?', inventory = '?' WHERE id = ? LIMIT 1;",
+
+	-- Sauvegarde de la position du joueur
+	local x, y, z = GetPlayerLocation(player)
+	PlayerData[player].position = {x= x, y= y, z= z}
+
+	local query = mariadb_prepare(sql, "UPDATE accounts SET admin = ?, bank_balance = ?, health = ?, health_state = '?', death_pos = '?', armor = ?, hunger = ?, thirst = ?, name = '?', clothing = '?', clothing_police = '?', inventory = '?', created = '?', position = '?', driver_license = ?, gun_license = ?, helicopter_license = ?, drug_knowledge = '?' WHERE id = ? LIMIT 1;",
 		PlayerData[player].admin,
-		PlayerData[player].cash,
 		PlayerData[player].bank_balance,
-		GetPlayerHealth(player),
-        GetPlayerArmor(player),
-        PlayerData[player].hunger,
+		100,
+		PlayerData[player].health_state,
+		json_encode(PlayerData[player].death_pos),
+		GetPlayerArmor(player),
+		PlayerData[player].hunger,
 		PlayerData[player].thirst,
 		PlayerData[player].name,
 		json_encode(PlayerData[player].clothing),
+		json_encode(PlayerData[player].clothing_police),
 		json_encode(PlayerData[player].inventory),
+		PlayerData[player].created,
+		json_encode(PlayerData[player].position),
+		PlayerData[player].driver_license,
+		PlayerData[player].gun_license,
+		PlayerData[player].helicopter_license,
+		json_encode(PlayerData[player].drug_knowledge),
 		PlayerData[player].accountid
-		)
+	)
         
 	mariadb_query(sql, query)
 end
 
 function SetPlayerLoggedIn(player)
     PlayerData[player].logged_in = true
-
-    CallEvent("OnPlayerJoin", player)
 end
+
+function IsAdmin(player)
+	return PlayerData[player].admin
+end
+
+AddFunctionExport("isAdmin", IsAdmin)

@@ -19,7 +19,19 @@ local gas_station = {
         { -167866, -37112, 1146 },
         { -168188, -37103, 1146 },
         { -168693, -37095, 1146 },
-        { -169015, -37088, 1146 }
+        { -169015, -37088, 1146 },
+        { 170659, 207324, 1411 },
+        { 170105, 207314, 1410 },
+        { 170630, 206760, 1411 },
+        { 170107, 206783, 1410 },
+        { 170099, 206107, 1410 },
+        { 170647, 206097, 1411},
+        { 170623, 205561, 1411 },
+        { 170100, 205587, 1411 },
+        { 42526, 137156, 1569 },
+        { 42966, 137150, 1569 },
+        { 42524, 136717, 1569 },
+        { 42949, 136744, 1569 }
     },
     pickup = {}
 }
@@ -36,15 +48,18 @@ AddEvent("OnPackageStart", function()
     CreateTimer(function()
         for k,v in pairs(GetAllVehicles()) do
             enginestate = GetVehicleEngineState(k)
-            if enginestate == true then
+            if enginestate then
                 if VehicleData[k] == nil then
                     return
                 end
-                VehicleData[k].fuel = VehicleData[k].fuel - 1
+                if VehicleData[k].fuel ~= 0 then
+                    VehicleData[k].fuel = VehicleData[k].fuel - 1
+                end
                 if VehicleData[k].fuel == 0 then
                     StopVehicleEngine(k)
                     VehicleData[k].fuel = 0
                 end
+                SetVehiclePropertyValue(k, "fuel", VehicleData[k].fuel, true)
             end
         end
     end, 15000)
@@ -55,34 +70,41 @@ AddEvent("OnPlayerJoin", function(player)
 end)
 
 AddEvent("OnPlayerEnterVehicle", function( player, vehicle, seat )
+    if VehicleData[vehicle] == nil then
+        return
+    end
     if seat == 1 then
+        SetVehiclePropertyValue(vehicle, "fuel", VehicleData[vehicle].fuel, true)
         if VehicleData[vehicle].fuel == 0 then
             StopVehicleEngine(vehicle)
         end
     end
 end)
 
-AddEvent("OnPlayerLeaveVehicle", function( player, vehicle)
-    StopVehicleEngine(vehicle)
+AddEvent("OnPlayerLeaveVehicle", function( player, vehicle, seat)
+    if seat == 1 then
+        StopVehicleEngine(vehicle)
+    end
 end)
 
 
-AddRemoteEvent("StartRefuel", function(player, vehicle) 
+AddRemoteEvent("StartRefuel", function(player, vehicle)
     price = math.ceil((100 - VehicleData[vehicle].fuel) * 0.5)
 
     if GetPlayerVehicle(player) ~= 0 then
-        AddPlayerChat(player, _("cant_refuel"))
+        CallRemoteEvent(player, "MakeNotification", _("cant_refuel"), "linear-gradient(to right, #ff5f6d, #ffc371)")
     else
         if VehicleData[vehicle].fuel >= 100 then
-            AddPlayerChat(player,  _("car_full"))
+            CallRemoteEvent(player,  "MakeNotification", _("car_full"), "linear-gradient(to right, #ff5f6d, #ffc371)")
         else
-            if PlayerData[player].cash < price then
-                AddPlayerChat(player, _("not_enought_cash") )
+            if GetPlayerCash(player) < price then
+                CallRemoteEvent(player, "MakeNotification", _("not_enought_cash"), "linear-gradient(to right, #ff5f6d, #ffc371)")
             else
                 SetPlayerAnimation(player,"COMBINE")
-                AddPlayerChat(player, _("car_refuelled_for", price, _("currency")))
+                CallRemoteEvent(player, "MakeNotification", _("car_refuelled_for", price, _("currency")), "linear-gradient(to right, #00b09b, #96c93d)")
                 VehicleData[vehicle].fuel = 100
-                PlayerData[player].cash = PlayerData[player].cash - price
+                SetVehiclePropertyValue(vehicle, "fuel", VehicleData[vehicle].fuel, true)
+                RemovePlayerCash(player, price)
             end
         end
     end
